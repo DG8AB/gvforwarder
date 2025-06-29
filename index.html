@@ -1,1 +1,202 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <title>Gmail→SMS Relay</title>
+    <style>
+      /* page reset */
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
 
+      body {
+        background: #0a0a0a;
+        color: #00ffe0;
+        font-family: 'Segoe UI', sans-serif;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      /* Creator badge */
+      #creatorBadge {
+        position: fixed;
+        top: 1rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: #111;
+        padding: 0.5rem 1rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 0 8px #00ffe099;
+        font-family: monospace;
+        display: flex;
+        align-items: center;
+        z-index: 1000;
+      }
+      #typewriter::after {
+        content: '|';
+        animation: blink 1s step-start infinite;
+        margin-left: 4px;
+      }
+      @keyframes blink { 50% { opacity: 0; } }
+      #dismissBtn {
+        background: transparent;
+        border: none;
+        color: #00ffe0;
+        margin-left: 0.5rem;
+        cursor: pointer;
+        font-size: 1rem;
+      }
+
+      /* Corner tag */
+      #cornerTag {
+        position: fixed;
+        bottom: 1rem;
+        right: 1.5rem;
+        color: #00ffe0;
+        font-family: monospace;
+        opacity: 0.6;
+      }
+
+      /* Main form container */
+      .container {
+        background: #1b1b1b;
+        padding: 2rem;
+        border-radius: 1rem;
+        box-shadow: 0 0 16px #00ffe099;
+        width: 320px;
+        text-align: center;
+      }
+      h2 {
+        margin-bottom: 1rem;
+        text-shadow: 0 0 8px #00ffe0;
+      }
+      input, select {
+        width: 100%;
+        padding: 0.75rem;
+        margin: 0.5rem 0;
+        border: none;
+        border-radius: 0.5rem;
+        background: #222;
+        color: #00ffe0;
+        font-size: 1rem;
+      }
+      input:invalid { box-shadow: 0 0 4px #ff5050; }
+      button.action {
+        width: 100%;
+        padding: 0.75rem;
+        margin-top: 0.75rem;
+        border: none;
+        border-radius: 0.5rem;
+        background: #00ffe0;
+        color: #0a0a0a;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      button.action:hover { background: #02d4b6; }
+      #status {
+        margin-top: 0.75rem;
+        color: #82fef5;
+        min-height: 1rem;
+        font-size: 0.9rem;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Typewriter badge -->
+    <div id="creatorBadge" style="display:none">
+      <span id="typewriter"></span>
+      <button id="dismissBtn">✖</button>
+    </div>
+    <!-- Corner tag -->
+    <div id="cornerTag">C09</div>
+
+    <div class="container">
+      <h2>Link Your Phone</h2>
+      <form id="smsForm">
+        <input
+          type="tel"
+          id="phone"
+          placeholder="10-digit phone number"
+          pattern="\\d{10}"
+          required
+        />
+        <select id="carrier">
+          <option value="txt.att.net">AT&T – txt.att.net</option>
+          <option value="vtext.com">Verizon – vtext.com</option>
+          <option value="tmomail.net">T-Mobile – tmomail.net</option>
+          <option value="messaging.sprintpcs.com">Sprint – messaging.sprintpcs.com</option>
+          <option value="vmobl.com">Virgin Mobile – vmobl.com</option>
+          <option value="sms.myboostmobile.com">Boost Mobile – sms.myboostmobile.com</option>
+          <option value="mms.cricketwireless.net">Cricket – mms.cricketwireless.net</option>
+          <option value="message.alltel.com">Alltel – message.alltel.com</option>
+          <option value="email.uscc.net">U.S. Cellular – email.uscc.net</option>
+        </select>
+        <button class="action" type="submit">💾 Save</button>
+      </form>
+      <button class="action" onclick="runForward()">🚀 Forward Now</button>
+      <button class="action" onclick="optOut()">🚫 Opt-Out</button>
+      <div id="status"></div>
+    </div>
+
+    <script>
+      // Typewriter badge logic
+      const msg = "Created by Dhruv Gowda";
+      const badge = document.getElementById("creatorBadge");
+      const twSpan = document.getElementById("typewriter");
+      const dismissed = localStorage.getItem("dgBadgeDismissed");
+
+      function typeWriter(i=0){
+        if(i<msg.length){
+          twSpan.textContent += msg[i++];
+          setTimeout(() => typeWriter(i), 75);
+        }
+      }
+      if(!dismissed){
+        badge.style.display="flex";
+        typeWriter();
+      }
+      document.getElementById("dismissBtn").onclick = ()=>{
+        badge.style.display="none";
+        localStorage.setItem("dgBadgeDismissed","1");
+      };
+
+      // Helpers to update status
+      function showStatus(txt){
+        document.getElementById("status").textContent = txt;
+      }
+
+      // Load stored settings
+      google.script.run
+        .withSuccessHandler(data => {
+          if (data.phone) document.getElementById("phone").value = data.phone;
+          if (data.carrier) document.getElementById("carrier").value = data.carrier;
+        })
+        .getStoredUser();
+
+      // Save handler
+      document.getElementById("smsForm").onsubmit = e => {
+        e.preventDefault();
+        const phone = document.getElementById("phone").value;
+        const carrier = document.getElementById("carrier").value;
+        google.script.run
+          .withSuccessHandler(() => showStatus("✅ Settings saved!"))
+          .storeUserDetails(phone, carrier);
+      };
+
+      // Manual forward
+      function runForward(){
+        google.script.run
+          .withSuccessHandler(res => showStatus(res || "✅ Done"))
+          .checkNewGVText();
+      }
+      // Opt-out
+      function optOut(){
+        google.script.run
+          .withSuccessHandler(() => showStatus("🚫 Unlinked & reset"))
+          .clearUserData();
+      }
+    </script>
+  </body>
+</html>
